@@ -9,3 +9,15 @@ export const getJobs = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+export const createJob = async (req: Request, res: Response) => {
+  const { title, pay, address, description } = req.body;
+
+  try {
+    const newJob = new Job({ title, pay, address, description });
+    await newJob.save();
+    res.status(201).json(newJob);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
