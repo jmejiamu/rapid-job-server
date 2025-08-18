@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { uploadToS3 } from "../utils/s3";
+import { deleteFromS3, uploadToS3 } from "../utils/s3";
 import sharp from "sharp";
 
 export const imageUploader = async (req: Request, res: Response) => {
@@ -46,5 +46,32 @@ export const imageUploader = async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Error uploading images:", err);
     res.status(500).json({ error: "Failed to upload images" });
+  }
+};
+
+export const deleteImage = async (req: Request, res: Response) => {
+  try {
+    const { imageKey } = req.body;
+    if (!imageKey) {
+      return res.status(400).json({ error: "No image key provided" });
+    }
+
+    // Extract the base filename (without sm_ or lg_)
+    const baseKey = imageKey.replace(/^sm_|^lg_/, "");
+
+    // Construct all keys
+    const keysToDelete = [
+      baseKey, // original
+      `sm_${baseKey}`,
+      `lg_${baseKey}`,
+    ];
+
+    // Delete all versions
+    await Promise.all(keysToDelete.map((key) => deleteFromS3(key)));
+
+    res.json({ message: "Image deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting image:", err);
+    res.status(500).json({ error: "Failed to delete image" });
   }
 };
