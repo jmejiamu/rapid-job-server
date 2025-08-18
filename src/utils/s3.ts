@@ -21,3 +21,11 @@ export const uploadToS3 = async (
   const data = await s3.upload(params).promise();
   return data.Location;
 };
+
+export const deleteFromS3 = async (imageKey: string) => {
+  const params = {
+    Bucket: process.env.AWS_S3_BUCKET!,
+    Key: imageKey,
+  };
+  await s3.deleteObject(params).promise();
+};
