@@ -12,36 +12,29 @@ const client = twilio(accountSid, authToken);
 
 export const register = async (req: Request, res: Response) => {
   const { phone, name } = req.body;
+
   if (!phone || !name)
     return res.status(400).json({ error: "Phone and name required" });
 
-  let user = await User.findOne({ phone });
+  const user = await User.findOne({ phone });
   if (user && user.isVerified)
     return res.status(400).json({ error: "User already exists" });
 
-  if (!user) {
-    user = new User({ phone, name, isVerified: false });
-  } else {
-    user.name = name;
-    user.isVerified = false;
-  }
-  await user.save();
-
-  // Send verification code using Twilio Verify
+  // Only send verification code, do not create user yet
   try {
     await client.verify
       .services(verifyServiceSid)
       .verifications.create({ to: phone, channel: "sms" });
     res.json({ success: true });
   } catch (err) {
+    console.error("Error sending verification code:", err);
     res.status(500).json({ error: "Failed to send verification code" });
   }
 };
 
 export const verify = async (req: Request, res: Response) => {
-  const { phone, code } = req.body;
-  const user = await User.findOne({ phone });
-  if (!user) return res.status(404).json({ error: "User not found" });
+  const { phone, code, name } = req.body;
+  let user = await User.findOne({ phone });
 
   // Verify code using Twilio Verify
   try {
@@ -51,7 +44,16 @@ export const verify = async (req: Request, res: Response) => {
     if (verificationCheck.status !== "approved") {
       return res.status(400).json({ error: "Invalid code" });
     }
-    user.isVerified = true;
+
+    if (!user) {
+      if (!name) {
+        return res.status(400).json({ error: "Name required for new user" });
+      }
+      user = new User({ phone, name, isVerified: true });
+    } else {
+      user.isVerified = true;
+      if (name) user.name = name;
+    }
     await user.save();
     const token = jwt.sign({ id: user._id, phone: user.phone }, jwtSecret, {
       expiresIn: "7d",
