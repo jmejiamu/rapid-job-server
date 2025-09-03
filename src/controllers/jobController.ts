@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Job from "../models/Job";
-
+import { io } from "../index";
+//Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
     const { title } = req.query;
@@ -32,6 +33,7 @@ export const createJob = async (req: Request, res: Response) => {
       userId: userId,
     });
     await newJob.save();
+    io.emit("jobCreated", newJob); // Emit event for real-time update
     res.status(201).json(newJob);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
