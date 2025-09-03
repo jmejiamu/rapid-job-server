@@ -3,7 +3,12 @@ import Job from "../models/Job";
 
 export const getJobs = async (req: Request, res: Response) => {
   try {
-    const jobs = await Job.find().sort({ postedAt: -1 });
+    const { title } = req.query;
+    const filter: Partial<Record<keyof typeof Job.schema.obj, unknown>> = {};
+    if (title) {
+      filter.title = { $regex: title, $options: "i" };
+    }
+    const jobs = await Job.find(filter).sort({ postedAt: -1 });
     res.json(jobs);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
