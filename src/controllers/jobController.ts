@@ -1,16 +1,29 @@
 import { Request, Response } from "express";
 import Job from "../models/Job";
 import { io } from "../index";
+import { paginate } from "../utils/pagination";
 //Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
-    const { title } = req.query;
+    const { title, page = 1, limit = 5 } = req.query;
     const filter: Partial<Record<keyof typeof Job.schema.obj, unknown>> = {};
     if (title) {
       filter.title = { $regex: title, $options: "i" };
     }
-    const jobs = await Job.find(filter).sort({ postedAt: -1 });
-    res.json(jobs);
+    let pageNum = parseInt(page as string, 10);
+    let limitNum = parseInt(limit as string, 10);
+    if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
+    if (isNaN(limitNum) || limitNum < 1) limitNum = 5;
+
+    const { results: jobs, pagination } = await paginate(Job, filter, {
+      page: pageNum,
+      limit: limitNum,
+    });
+
+    res.json({
+      jobs,
+      pagination,
+    });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
@@ -49,8 +62,22 @@ export const getUserJobs = async (req: Request, res: Response) => {
   }
 
   try {
-    const jobs = await Job.find({ userId: userId }).sort({ postedAt: -1 });
-    res.json(jobs);
+    const { page = 1, limit = 5 } = req.query;
+    let pageNum = parseInt(page as string, 10);
+    let limitNum = parseInt(limit as string, 10);
+    if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
+    if (isNaN(limitNum) || limitNum < 1) limitNum = 5;
+
+    const { results: jobs, pagination } = await paginate(
+      Job,
+      { userId },
+      { page: pageNum, limit: limitNum }
+    );
+
+    res.json({
+      myJobs: jobs,
+      pagination,
+    });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
