@@ -58,7 +58,7 @@ export const verify = async (req: Request, res: Response) => {
     const token = jwt.sign({ id: user._id, phone: user.phone }, jwtSecret, {
       expiresIn: "7d",
     });
-    res.json({ token });
+    res.json({ token, name: user.name, phone: user.phone });
   } catch (err) {
     res.status(500).json({ error: "Verification failed" });
   }
