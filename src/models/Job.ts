@@ -14,6 +14,17 @@ const jobSchema = new Schema({
   ],
   postedAt: { type: Date, default: Date.now },
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  requests: [
+    {
+      userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending",
+      },
+      requestedAt: { type: Date, default: Date.now },
+    },
+  ],
 });
 
 export default model("Job", jobSchema);
