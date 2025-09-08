@@ -206,11 +206,33 @@ export const getRequestedJobs = async (req: Request, res: Response) => {
   }
 
   try {
-    const requestedJobs = await JobRequest.find({ ownerPostId: userId })
+    const requestedJobs = await JobRequest.find({
+      ownerPostId: userId,
+      status: "pending",
+    })
       .populate("userId", "name email")
       .populate("jobId");
 
     res.json({ requestedJobs });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const getRequestCount = async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id || (req as any).user?._id;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized: user id missing" });
+  }
+
+  try {
+    const requestCount = await JobRequest.countDocuments({
+      ownerPostId: userId,
+      status: "pending",
+    });
+
+    res.json({ requestCount });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
