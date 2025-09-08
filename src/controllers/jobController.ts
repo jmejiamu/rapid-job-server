@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Job from "../models/Job";
 import { io } from "../index";
 import { paginate } from "../utils/pagination";
+import JobRequest from "../models/Request";
 //Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
@@ -85,7 +86,6 @@ export const getUserJobs = async (req: Request, res: Response) => {
 
 export const requestJob = async (req: Request, res: Response) => {
   const { jobId } = req.params;
-  console.log("🚀 ~ requestJob ~ jobId:", jobId);
   const userId = (req as any).user?.id || (req as any).user?._id;
 
   if (!userId) {
@@ -97,21 +97,34 @@ export const requestJob = async (req: Request, res: Response) => {
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
     }
+    // Create a new request
 
+    const cannotDoThisJob = await job.userId.equals(userId);
+    if (cannotDoThisJob) {
+      return res.status(400).json({ error: "You cannot request your own job" });
+    }
     // Check if user has already requested the job
-    const alreadyRequested = job.requests.find(
-      (request) => request.userId.toString() === userId.toString()
-    );
+    const alreadyRequested = await JobRequest.findOne({ jobId, userId });
     if (alreadyRequested) {
+      console.log("You have already requested this job");
       return res
         .status(400)
         .json({ error: "You have already requested this job" });
     }
 
-    job.requests.push({ userId, status: "pending" });
-    await job.save();
+    const ownerPostId = await job.userId;
+
+    const newRequest = new JobRequest({
+      jobId,
+      userId: userId,
+      status: "pending",
+      ownerPostId,
+    });
+    await newRequest.save();
+
     io.emit("jobRequested", { jobId, userId }); // Emit event for real-time update
-    res.json({ message: "Job request submitted", job });
+    console.log("New Request:", newRequest);
+    return res.json({ message: "Job request submitted", request: newRequest });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
@@ -138,13 +151,13 @@ export const approveRequestJob = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Forbidden: not job owner" });
     }
 
-    const request = job.requests.id(requestId);
+    const request = await JobRequest.findById(requestId);
     if (!request) {
       return res.status(404).json({ error: "Request not found" });
     }
 
     request.status = "approved";
-    await job.save();
+    await request.save();
     io.emit("requestApproved", { jobId, requestId }); // Emit event for real-time update
     res.json({ message: "Request approved", job });
   } catch (err) {
@@ -171,13 +184,13 @@ export const rejectRequestJob = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Forbidden: not job owner" });
     }
 
-    const request = job.requests.id(requestId);
+    const request = await JobRequest.findById(requestId);
     if (!request) {
       return res.status(404).json({ error: "Request not found" });
     }
 
     request.status = "rejected";
-    await job.save();
+    await request.save();
     io.emit("requestRejected", { jobId, requestId }); // Emit event for real-time update
     res.json({ message: "Request rejected", job });
   } catch (err) {
@@ -193,11 +206,11 @@ export const getRequestedJobs = async (req: Request, res: Response) => {
   }
 
   try {
-    const jobs = await Job.find({ userId, "requests.0": { $exists: true } }) // Added: Only jobs with at least one request
-      .populate("requests.userId", "name email") // Populate requester details
-      .populate("userId", "name email");
+    const requestedJobs = await JobRequest.find({ ownerPostId: userId })
+      .populate("userId", "name email")
+      .populate("jobId");
 
-    res.json({ requestedJobs: jobs });
+    res.json({ requestedJobs });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
