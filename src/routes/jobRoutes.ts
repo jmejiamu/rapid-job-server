@@ -19,7 +19,11 @@ router.get("/my-jobs", authenticate, getUserJobs);
 
 router.post("/request-job/:jobId", authenticate, requestJob);
 router.post("/approve-request", authenticate, approveRequestJob);
-router.post("/reject-request", authenticate, rejectRequestJob);
+router.post(
+  "/reject-request/:jobId/:requestId",
+  authenticate,
+  rejectRequestJob
+);
 router.get("/my-requests", authenticate, getRequestedJobs);
 
 router.get("/request-count", authenticate, getRequestCount);
