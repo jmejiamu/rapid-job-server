@@ -191,8 +191,8 @@ export const rejectRequestJob = async (req: Request, res: Response) => {
 
     request.status = "rejected";
     await request.save();
-    io.emit("requestRejected", { jobId, requestId }); // Emit event for real-time update
-    res.json({ message: "Request rejected", job });
+    io.emit("requestRejected", { request }); // Emit event for real-time update
+    res.json({ message: "Request rejected", request });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
