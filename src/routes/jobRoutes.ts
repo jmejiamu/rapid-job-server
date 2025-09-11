@@ -18,7 +18,11 @@ router.post("/create-job", authenticate, createJob);
 router.get("/my-jobs", authenticate, getUserJobs);
 
 router.post("/request-job/:jobId", authenticate, requestJob);
-router.post("/approve-request", authenticate, approveRequestJob);
+router.post(
+  "/approve-request/:jobId/:requestId",
+  authenticate,
+  approveRequestJob
+);
 router.post(
   "/reject-request/:jobId/:requestId",
   authenticate,
