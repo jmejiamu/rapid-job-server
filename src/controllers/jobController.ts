@@ -158,8 +158,8 @@ export const approveRequestJob = async (req: Request, res: Response) => {
 
     request.status = "approved";
     await request.save();
-    io.emit("requestApproved", { jobId, requestId }); // Emit event for real-time update
-    res.json({ message: "Request approved", job });
+    io.emit("requestApproved", { request }); // Emit event for real-time update
+    res.json({ message: "Request approved", request });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
