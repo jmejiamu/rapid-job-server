@@ -9,6 +9,7 @@ import routes from "./routes";
 import { config } from "./config/db";
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
+import Room from "./models/Room";
 
 const app = express();
 const server = http.createServer(app);
@@ -19,6 +20,49 @@ const io = new SocketIOServer(server, {
   },
 });
 export { io };
+
+io.on("connection", (socket) => {
+  console.log("A user connected:", socket.id);
+
+  socket.on(
+    "joinRoom",
+    async ({ roomId, userId }: { roomId: string; userId: string }) => {
+      socket.join(roomId);
+      console.log(`User ${userId} joined room ${roomId}`);
+
+      // Save to DB
+      try {
+        const userRoom = new Room({ userId, roomId });
+        await userRoom.save();
+      } catch (error) {
+        console.error("Error saving room join:", error);
+      }
+    }
+  );
+
+  socket.on(
+    "leaveRoom",
+    async ({ roomId, userId }: { roomId: string; userId: string }) => {
+      socket.leave(roomId);
+      console.log(`User ${userId} left room ${roomId}`);
+
+      // Optionally, update or delete from DB (e.g., set leftAt)
+      try {
+        await Room.findOneAndUpdate(
+          { userId, roomId },
+          { leftAt: new Date() },
+          { upsert: false }
+        );
+      } catch (error) {
+        console.error("Error updating room leave:", error);
+      }
+    }
+  );
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 

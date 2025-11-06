@@ -58,7 +58,7 @@ export const verify = async (req: Request, res: Response) => {
     const token = jwt.sign({ id: user._id, phone: user.phone }, jwtSecret, {
       expiresIn: "7d",
     });
-    res.json({ token, name: user.name, phone: user.phone });
+    res.json({ token, name: user.name, phone: user.phone, userId: user._id });
   } catch (err) {
     res.status(500).json({ error: "Verification failed" });
   }
@@ -73,5 +73,5 @@ export const login = async (req: Request, res: Response) => {
   const token = jwt.sign({ id: user._id, phone: user.phone }, jwtSecret, {
     expiresIn: "7d",
   });
-  res.json({ token, name: user.name, phone: user.phone });
+  res.json({ token, name: user.name, phone: user.phone, userId: user._id });
 };

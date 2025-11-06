@@ -3,6 +3,7 @@ import Job from "../models/Job";
 import { io } from "../index";
 import { paginate } from "../utils/pagination";
 import JobRequest from "../models/Request";
+import Chat, { IChat } from "../models/Chat";
 //Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
@@ -159,6 +160,20 @@ export const approveRequestJob = async (req: Request, res: Response) => {
     request.status = "approved";
     await request.save();
     io.emit("requestApproved", { request }); // Emit event for real-time update
+    // Send a chat to the requester
+    const requesterId = request.userId.toString();
+    const newMessage: IChat = new Chat({
+      jobId,
+      senderId: userId,
+      receiverId: requesterId,
+      message: `Your request for job ${jobId} has been approved.`,
+      timestamp: new Date(),
+    });
+
+    await newMessage.save();
+    io.to(requesterId).emit("newMessage", {
+      message: `Your request for job ${jobId} has been approved.`,
+    });
     res.json({ message: "Request approved", request });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
