@@ -23,9 +23,7 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     await newMessage.save();
 
-    console.log("🚀 ~ sendMessage ->>>>>");
     io.emit("newMessage", newMessage); // Emit event for real-time update
-    console.log("🚀 ~ sendMessage ~ newMessage:", newMessage);
 
     res.status(201).json(newMessage);
   } catch (err) {
