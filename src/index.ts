@@ -22,8 +22,6 @@ const io = new SocketIOServer(server, {
 export { io };
 
 io.on("connection", (socket) => {
-  console.log("A user connected:", socket.id);
-
   socket.on(
     "joinRoom",
     async ({ roomId, userId }: { roomId: string; userId: string }) => {
@@ -32,6 +30,20 @@ io.on("connection", (socket) => {
 
       // Save to DB
       try {
+        const existingActiveRoom = await Room.findOne({
+          userId,
+          roomId,
+          leftAt: null, // Only check for active (unleft) entries
+        });
+
+        if (existingActiveRoom) {
+          console.log(
+            `User ${userId} is already in room ${roomId}, skipping save.`
+          );
+          return; // Skip saving to avoid duplicates
+        }
+
+        // Save new entry only if not already active
         const userRoom = new Room({ userId, roomId });
         await userRoom.save();
       } catch (error) {
