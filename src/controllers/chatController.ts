@@ -23,7 +23,9 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     await newMessage.save();
 
-    io.to(receiverId.toString()).emit("newMessage", { message: newMessage }); // Emit event for real-time update
+    console.log("🚀 ~ sendMessage ->>>>>");
+    io.emit("newMessage", newMessage); // Emit event for real-time update
+    console.log("🚀 ~ sendMessage ~ newMessage:", newMessage);
 
     res.status(201).json(newMessage);
   } catch (err) {
@@ -33,9 +35,7 @@ export const sendMessage = async (req: Request, res: Response) => {
 
 export const getChatHistory = async (req: Request, res: Response) => {
   const { jobId, otherUserId } = req.params;
-  console.log("🚀 ~ getChatHistory ~ jobId:", jobId);
   const userId = (req as any).user?.id || (req as any).user?._id;
-  console.log("🚀 ~ getChatHistory ~ userId:", userId);
 
   if (!userId) {
     return res.status(401).json({ error: "Unauthorized: user id missing" });
