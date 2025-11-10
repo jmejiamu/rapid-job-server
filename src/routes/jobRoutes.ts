@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   approveRequestJob,
   createJob,
+  deleteJob,
   getJobs,
   getRequestCount,
   getRequestedJobs,
@@ -16,6 +17,7 @@ const router = Router();
 router.get("/retrieve-jobs", getJobs);
 router.post("/create-job", authenticate, createJob);
 router.get("/my-jobs", authenticate, getUserJobs);
+router.delete("/delete-job/:jobId", authenticate, deleteJob);
 
 router.post("/request-job/:jobId", authenticate, requestJob);
 router.post(
