@@ -252,3 +252,29 @@ export const getRequestCount = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+export const deleteJob = async (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const userId = (req as any).user?.id || (req as any).user?._id;
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized: user id missing" });
+  }
+  try {
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    // Check if the current user is the owner of the job
+    if (job.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ error: "Forbidden: not job owner" });
+    }
+
+    await Job.findByIdAndDelete(jobId);
+    io.emit("jobDeleted", { jobId }); // Emit event for real-time update
+    res.json({ message: "Job deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
