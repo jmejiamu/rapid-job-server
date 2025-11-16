@@ -272,7 +272,7 @@ export const deleteJob = async (req: Request, res: Response) => {
     }
 
     await Job.findByIdAndDelete(jobId);
-    io.emit("jobDeleted", { jobId }); // Emit event for real-time update
+    io.emit("jobDeleted", job); // Emit event for real-time update
     res.json({ message: "Job deleted successfully" });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
