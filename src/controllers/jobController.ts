@@ -124,7 +124,7 @@ export const requestJob = async (req: Request, res: Response) => {
     await newRequest.save();
 
     io.emit("jobRequested", { jobId, userId }); // Emit event for real-time update
-    console.log("New Request:", newRequest);
+
     return res.json({ message: "Job request submitted", request: newRequest });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
@@ -166,7 +166,7 @@ export const approveRequestJob = async (req: Request, res: Response) => {
       jobId,
       senderId: userId,
       receiverId: requesterId,
-      message: `Your request for job ${jobId} has been approved.`,
+      message: `Your request for job ${job.title} has been approved. The address is: ${job.address}`,
       timestamp: new Date(),
     });
 
