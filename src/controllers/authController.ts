@@ -1,12 +1,14 @@
 import jwt from "jsonwebtoken";
 import twilio from "twilio";
 import { Request, Response } from "express";
+import bcrypt from "bcrypt";
 
 import User from "../models/User";
+import { generateTokens } from "../utils/generateTokens";
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const verifyServiceSid = process.env.TWILIO_VERIFY_SERVICE_SID!;
-const jwtSecret = process.env.JWT_SECRET || "secret";
+const refreshSecret = process.env.REFRESH_SECRET || "refreshSecret";
 
 const client = twilio(accountSid, authToken);
 
@@ -55,10 +57,22 @@ export const verify = async (req: Request, res: Response) => {
       if (name) user.name = name;
     }
     await user.save();
-    const token = jwt.sign({ id: user._id, phone: user.phone }, jwtSecret, {
-      expiresIn: "7d",
+
+    const { accessToken, refreshToken } = generateTokens(
+      user._id as string,
+      user.phone
+    );
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    user.refreshToken = hashedRefreshToken;
+    await user.save();
+
+    res.json({
+      accessToken,
+      refreshToken,
+      name: user.name,
+      phone: user.phone,
+      userId: user._id,
     });
-    res.json({ token, name: user.name, phone: user.phone, userId: user._id });
   } catch (err) {
     res.status(500).json({ error: "Verification failed" });
   }
@@ -70,8 +84,71 @@ export const login = async (req: Request, res: Response) => {
   if (!user || !user.isVerified)
     return res.status(400).json({ error: "User not verified" });
 
-  const token = jwt.sign({ id: user._id, phone: user.phone }, jwtSecret, {
-    expiresIn: "7d",
+  const { accessToken, refreshToken } = generateTokens(
+    user._id as string,
+    user.phone
+  );
+  const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+  user.refreshToken = hashedRefreshToken;
+  await user.save();
+
+  res.json({
+    accessToken,
+    refreshToken,
+    name: user.name,
+    phone: user.phone,
+    userId: user._id,
   });
-  res.json({ token, name: user.name, phone: user.phone, userId: user._id });
+};
+
+export const refresh = async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+  const refreshToken = authHeader?.split(" ")[1];
+  if (!refreshToken) return res.status(401).json({ error: "No refresh token" });
+
+  try {
+    const decoded = jwt.verify(refreshToken, refreshSecret) as { id: string };
+    const user = await User.findById(decoded.id);
+    if (
+      !user ||
+      !user.refreshToken ||
+      !(await bcrypt.compare(refreshToken, user.refreshToken))
+    ) {
+      return res.status(403).json({ error: "Invalid refresh token" });
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(
+      user._id as string,
+      user.phone
+    );
+    const hashedNewRefreshToken = await bcrypt.hash(newRefreshToken, 10);
+    user.refreshToken = hashedNewRefreshToken;
+    await user.save();
+
+    res.json({
+      accessToken,
+      refreshToken: newRefreshToken,
+      name: user.name,
+      phone: user.phone,
+      userId: user._id,
+    });
+  } catch (err) {
+    res.status(403).json({ error: "Invalid refresh token" });
+  }
+};
+
+// New logout function
+// TODO: implement this later if it is needed
+export const logout = async (req: Request, res: Response) => {
+  const { refreshToken } = req.cookies;
+  if (refreshToken) {
+    // Invalidate the refresh token in DB
+    const decoded = jwt.verify(refreshToken, refreshSecret) as { id: string };
+    const user = await User.findById(decoded.id);
+    if (user) {
+      user.refreshToken = undefined;
+      await user.save();
+    }
+  }
+  res.json({ message: "Logged out" });
 };
