@@ -7,10 +7,13 @@ import Chat, { IChat } from "../models/Chat";
 //Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
-    const { title, page = 1, limit = 5 } = req.query;
+    const { title, category, page = 1, limit = 5 } = req.query;
     const filter: Partial<Record<keyof typeof Job.schema.obj, unknown>> = {};
     if (title) {
       filter.title = { $regex: title, $options: "i" };
+    }
+    if (category) {
+      filter.category = category;
     }
     let pageNum = parseInt(page as string, 10);
     let limitNum = parseInt(limit as string, 10);
@@ -32,7 +35,7 @@ export const getJobs = async (req: Request, res: Response) => {
 };
 
 export const createJob = async (req: Request, res: Response) => {
-  const { title, pay, address, description, images } = req.body;
+  const { title, pay, address, description, images, category } = req.body;
   const userId = (req as any).user?.id || (req as any).user?._id;
   if (!userId) {
     return res.status(401).json({ error: "Unauthorized: user id missing" });
@@ -46,6 +49,7 @@ export const createJob = async (req: Request, res: Response) => {
       description,
       images,
       userId: userId,
+      category,
     });
     await newJob.save();
     io.emit("jobCreated", newJob); // Emit event for real-time update
