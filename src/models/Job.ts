@@ -12,6 +12,7 @@ const jobSchema = new Schema({
       lg: { type: String, required: false },
     },
   ],
+  category: { type: String, required: true },
   postedAt: { type: Date, default: Date.now },
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
 });
