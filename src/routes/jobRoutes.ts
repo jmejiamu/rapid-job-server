@@ -1,8 +1,10 @@
 import { Router } from "express";
 import {
   approveRequestJob,
+  completeJob,
   createJob,
   deleteJob,
+  getApprovedJobsByOwner,
   getJobs,
   getRequestCount,
   getRequestedJobs,
@@ -33,5 +35,8 @@ router.post(
 router.get("/my-requests", authenticate, getRequestedJobs);
 
 router.get("/request-count", authenticate, getRequestCount);
+
+router.post("/complete-job/:jobId", authenticate, completeJob);
+router.get("/approved-jobs", authenticate, getApprovedJobsByOwner);
 
 export default router;
