@@ -15,6 +15,13 @@ const jobSchema = new Schema({
   category: { type: String, required: true },
   postedAt: { type: Date, default: Date.now },
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
+
+  assignedTo: { type: Schema.Types.ObjectId, ref: "User", required: false },
+  status: {
+    type: String,
+    enum: ["open", "approved", "completed", "closed"],
+    default: "open",
+  },
 });
 
 export default model("Job", jobSchema);

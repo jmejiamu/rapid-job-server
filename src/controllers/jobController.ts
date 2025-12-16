@@ -7,7 +7,8 @@ import Chat, { IChat } from "../models/Chat";
 //Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
-    const { title, category, page = 1, limit = 5 } = req.query;
+    const { title, category, status = "open", page = 1, limit = 5 } = req.query;
+
     const filter: Partial<Record<keyof typeof Job.schema.obj, unknown>> = {};
     if (title) {
       filter.title = { $regex: title, $options: "i" };
@@ -15,6 +16,10 @@ export const getJobs = async (req: Request, res: Response) => {
     if (category) {
       filter.category = category;
     }
+    if (status) {
+      filter.status = status;
+    }
+
     let pageNum = parseInt(page as string, 10);
     let limitNum = parseInt(limit as string, 10);
     if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
@@ -163,6 +168,11 @@ export const approveRequestJob = async (req: Request, res: Response) => {
 
     request.status = "approved";
     await request.save();
+
+    job.assignedTo = request.userId;
+    job.status = "approved";
+    await job.save();
+
     io.emit("requestApproved", { request }); // Emit event for real-time update
     // Send a chat to the requester
     const requesterId = request.userId.toString();
@@ -179,6 +189,39 @@ export const approveRequestJob = async (req: Request, res: Response) => {
       message: `Your request for job ${jobId} has been approved.`,
     });
     res.json({ message: "Request approved", request });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const getApprovedJobsByOwner = async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const { page = 1, limit = 5, status = "approved" } = req.query;
+    let pageNum = parseInt(page as string, 10);
+    let limitNum = parseInt(limit as string, 10);
+    if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
+    if (isNaN(limitNum) || limitNum < 1) limitNum = 5;
+
+    const filter: any = { $or: [{ userId }, { assignedTo: userId }] };
+    if (status !== "all") filter.status = status;
+
+    const { results: jobs, pagination } = await paginate(Job, filter, {
+      page: pageNum,
+      limit: limitNum,
+    });
+
+    const mappedJobs = jobs.map((job: any) => {
+      const j = job.toObject ? job.toObject() : job;
+      const isOwner = j.userId && j.userId.toString() === userId.toString();
+      const isAssignee =
+        j.assignedTo && j.assignedTo.toString() === userId.toString();
+      return { ...j, isOwner, isAssignee, canComplete: isOwner };
+    });
+
+    res.json({ myApprovedJobs: mappedJobs, pagination });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
@@ -212,6 +255,31 @@ export const rejectRequestJob = async (req: Request, res: Response) => {
     await request.save();
     io.emit("requestRejected", { request }); // Emit event for real-time update
     res.json({ message: "Request rejected", request });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const completeJob = async (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const isOwner = job.userId && job.userId.toString() === userId.toString();
+
+    if (!isOwner) {
+      return res.status(403).json({ error: "Forbidden: not job owner " });
+    }
+
+    job.status = "completed";
+    await job.save();
+
+    io.emit("jobCompleted", { jobId, assignedTo: job.assignedTo });
+    res.json({ message: "Job marked as completed", job });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
