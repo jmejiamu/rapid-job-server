@@ -199,14 +199,16 @@ export const getApprovedJobsByOwner = async (req: Request, res: Response) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const { page = 1, limit = 5, status = "approved" } = req.query;
+    const { page = 1, limit = 5 } = req.query;
     let pageNum = parseInt(page as string, 10);
     let limitNum = parseInt(limit as string, 10);
     if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
     if (isNaN(limitNum) || limitNum < 1) limitNum = 5;
 
-    const filter: any = { $or: [{ userId }, { assignedTo: userId }] };
-    if (status !== "all") filter.status = status;
+    const filter: any = {
+      $or: [{ userId }, { assignedTo: userId }],
+      status: { $in: ["approved", "completed"] },
+    };
 
     const { results: jobs, pagination } = await paginate(Job, filter, {
       page: pageNum,
