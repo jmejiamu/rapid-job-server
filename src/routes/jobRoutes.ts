@@ -8,7 +8,10 @@ import {
   getJobs,
   getRequestCount,
   getRequestedJobs,
+  getReviewsByJob,
+  getReviewsByUser,
   getUserJobs,
+  leaveReview,
   rejectRequestJob,
   requestJob,
 } from "../controllers/jobController";
@@ -38,5 +41,9 @@ router.get("/request-count", authenticate, getRequestCount);
 
 router.post("/complete-job/:jobId", authenticate, completeJob);
 router.get("/approved-jobs", authenticate, getApprovedJobsByOwner);
+
+router.post("/review/:jobId", authenticate, leaveReview); // reviewer posts a review for the other participant for this job
+router.get("/reviews/:jobId", authenticate, getReviewsByJob); // list reviews for a job
+router.get("/user-reviews/:userId", authenticate, getReviewsByUser); // list reviews for a user
 
 export default router;

@@ -4,6 +4,7 @@ import { io } from "../index";
 import { paginate } from "../utils/pagination";
 import JobRequest from "../models/Request";
 import Chat, { IChat } from "../models/Chat";
+import Review from "../models/Review";
 //Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
@@ -215,12 +216,36 @@ export const getApprovedJobsByOwner = async (req: Request, res: Response) => {
       limit: limitNum,
     });
 
-    const mappedJobs = jobs.map((job: any) => {
+    // Populate owner and assignee so we can send their names
+    const populatedJobs = await Job.populate(jobs, [
+      { path: "userId", select: "name" },
+      { path: "assignedTo", select: "name" },
+    ]);
+
+    const mappedJobs = populatedJobs.map((job: any) => {
       const j = job.toObject ? job.toObject() : job;
-      const isOwner = j.userId && j.userId.toString() === userId.toString();
+      const isOwner =
+        (j.userId &&
+          (j.userId._id ? j.userId._id.toString() : j.userId.toString())) ===
+        userId.toString();
       const isAssignee =
-        j.assignedTo && j.assignedTo.toString() === userId.toString();
-      return { ...j, isOwner, isAssignee, canComplete: isOwner };
+        (j.assignedTo &&
+          (j.assignedTo._id
+            ? j.assignedTo._id.toString()
+            : j.assignedTo.toString())) === userId.toString();
+
+      const ownerName = j.userId && j.userId.name ? j.userId.name : null;
+      const assigneeName =
+        j.assignedTo && j.assignedTo.name ? j.assignedTo.name : null;
+
+      return {
+        ...j,
+        isOwner,
+        isAssignee,
+        ownerName,
+        assigneeName,
+        canComplete: isOwner,
+      };
     });
 
     res.json({ myApprovedJobs: mappedJobs, pagination });
@@ -282,6 +307,90 @@ export const completeJob = async (req: Request, res: Response) => {
 
     io.emit("jobCompleted", { jobId, assignedTo: job.assignedTo });
     res.json({ message: "Job marked as completed", job });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Add after completeJob (or anywhere exported in this file)
+export const leaveReview = async (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const { rating, comment, revieweeId } = req.body;
+  const reviewerId = (req as any).user?.id || (req as any).user?._id;
+
+  if (!reviewerId) return res.status(401).json({ error: "Unauthorized" });
+  if (!rating || !revieweeId)
+    return res.status(400).json({ error: "rating and revieweeId required" });
+
+  try {
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    // Only owner or assigned user can leave reviews after completion
+    const isOwner =
+      job.userId && job.userId.toString() === reviewerId.toString();
+    const isAssignee =
+      job.assignedTo && job.assignedTo.toString() === reviewerId.toString();
+    if (!isOwner && !isAssignee) {
+      return res.status(403).json({ error: "Forbidden: not participant" });
+    }
+
+    // reviewee must be the other participant
+    const expectedReviewee =
+      isOwner && job.assignedTo
+        ? job.assignedTo.toString()
+        : isAssignee
+        ? job.userId.toString()
+        : null;
+    if (!expectedReviewee || expectedReviewee !== revieweeId.toString()) {
+      return res
+        .status(400)
+        .json({ error: "revieweeId must be the other participant of the job" });
+    }
+
+    // Prevent duplicate review by same reviewer for same job
+    const existing = await Review.findOne({ jobId, reviewerId });
+    if (existing)
+      return res.status(400).json({ error: "Review already submitted" });
+
+    const review = new Review({
+      jobId,
+      reviewerId,
+      revieweeId,
+      rating,
+      comment,
+    });
+    await review.save();
+
+    io.emit("reviewCreated", { review });
+
+    res.status(201).json({ message: "Review submitted", review });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const getReviewsByJob = async (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  try {
+    const reviews = await Review.find({ jobId })
+      .populate("reviewerId", "name phone")
+      .populate("revieweeId", "name phone");
+    res.json({ reviews });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+export const getReviewsByUser = async (req: Request, res: Response) => {
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const reviews = await Review.find({ revieweeId: userId }).populate(
+      "reviewerId",
+      "name phone"
+    );
+    res.json({ reviews });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
