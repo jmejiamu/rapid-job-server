@@ -386,11 +386,28 @@ export const getReviewsByUser = async (req: Request, res: Response) => {
   const userId = (req as any).user?.id || (req as any).user?._id;
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   try {
-    const reviews = await Review.find({ revieweeId: userId }).populate(
-      "reviewerId",
-      "name phone"
+    const { page = 1, limit = 5 } = req.query;
+
+    let pageNum = parseInt(page as string, 10);
+    let limitNum = parseInt(limit as string, 10);
+    if (isNaN(pageNum) || pageNum < 1) pageNum = 1;
+    if (isNaN(limitNum) || limitNum < 1) limitNum = 5;
+
+    const { results: reviews, pagination } = await paginate(
+      Review,
+      { revieweeId: userId },
+      {
+        page: pageNum,
+        limit: limitNum,
+        sort: { createdAt: -1 },
+      }
     );
-    res.json({ reviews });
+
+    const populatedReviews = await Review.populate(reviews, {
+      path: "reviewerId",
+      select: "name phone",
+    });
+    res.json({ reviews: populatedReviews, pagination });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
