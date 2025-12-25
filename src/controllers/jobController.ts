@@ -222,31 +222,45 @@ export const getApprovedJobsByOwner = async (req: Request, res: Response) => {
       { path: "assignedTo", select: "name" },
     ]);
 
-    const mappedJobs = populatedJobs.map((job: any) => {
-      const j = job.toObject ? job.toObject() : job;
-      const isOwner =
-        (j.userId &&
-          (j.userId._id ? j.userId._id.toString() : j.userId.toString())) ===
-        userId.toString();
-      const isAssignee =
-        (j.assignedTo &&
-          (j.assignedTo._id
-            ? j.assignedTo._id.toString()
-            : j.assignedTo.toString())) === userId.toString();
+    const mappedJobs = await Promise.all(
+      populatedJobs.map(async (job: any) => {
+        const j = job.toObject ? job.toObject() : job;
+        const isOwner =
+          (j.userId &&
+            (j.userId._id ? j.userId._id.toString() : j.userId.toString())) ===
+          userId.toString();
+        const isAssignee =
+          (j.assignedTo &&
+            (j.assignedTo._id
+              ? j.assignedTo._id.toString()
+              : j.assignedTo.toString())) === userId.toString();
 
-      const ownerName = j.userId && j.userId.name ? j.userId.name : null;
-      const assigneeName =
-        j.assignedTo && j.assignedTo.name ? j.assignedTo.name : null;
+        const ownerName = j.userId && j.userId.name ? j.userId.name : null;
+        const assigneeName =
+          j.assignedTo && j.assignedTo.name ? j.assignedTo.name : null;
 
-      return {
-        ...j,
-        isOwner,
-        isAssignee,
-        ownerName,
-        assigneeName,
-        canComplete: isOwner,
-      };
-    });
+        const hasCurrentUserReviewed = !!(await Review.findOne({
+          jobId: j._id,
+          reviewerId: userId,
+        }));
+
+        const canReview =
+          j.status === "completed" &&
+          (isOwner || isAssignee) &&
+          !hasCurrentUserReviewed;
+
+        return {
+          ...j,
+          isOwner,
+          isAssignee,
+          ownerName,
+          assigneeName,
+          canComplete: isOwner,
+          canReview,
+          hasCurrentUserReviewed,
+        };
+      })
+    );
 
     res.json({ myApprovedJobs: mappedJobs, pagination });
   } catch (err) {
