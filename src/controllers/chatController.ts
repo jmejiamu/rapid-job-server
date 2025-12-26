@@ -23,7 +23,13 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     await newMessage.save();
 
-    io.emit("newMessage", newMessage); // Emit event for real-time update
+    const chatRoomId = `${jobId}-${[senderId.toString(), receiverId?.toString()]
+      .sort()
+      .join("-")}`;
+
+    io.to(senderId.toString()).emit("newMessage", newMessage);
+    if (receiverId) io.to(receiverId.toString()).emit("newMessage", newMessage);
+    io.to(chatRoomId).emit("newMessage", newMessage);
 
     res.status(201).json(newMessage);
   } catch (err) {
@@ -104,6 +110,11 @@ export const getUserRooms = async (req: Request, res: Response) => {
         };
       })
     );
+    roomList.sort((a, b) => {
+      const at = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const bt = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return bt - at; // newest first
+    });
 
     res.json({ rooms: roomList });
   } catch (err) {
