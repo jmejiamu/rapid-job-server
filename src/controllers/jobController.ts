@@ -86,9 +86,21 @@ export const getUserJobs = async (req: Request, res: Response) => {
       { page: pageNum, limit: limitNum }
     );
 
+    const [reviewsCount, jobsDone] = await Promise.all([
+      Review.countDocuments({ revieweeId: userId }), // or reviewerId if you want reviews given
+      Job.find({ assignedTo: userId, status: "completed" }).populate(
+        "userId",
+        "name"
+      ),
+    ]);
+
     res.json({
       myJobs: jobs,
       pagination,
+      counts: {
+        reviews: reviewsCount,
+        jobsDone: jobsDone.length,
+      },
     });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
