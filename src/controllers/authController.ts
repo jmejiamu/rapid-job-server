@@ -35,7 +35,7 @@ export const register = async (req: Request, res: Response) => {
 };
 
 export const verify = async (req: Request, res: Response) => {
-  const { phone, code, name } = req.body;
+  const { phone, code, name, deviceToken } = req.body;
   let user = await User.findOne({ phone });
 
   // Verify code using Twilio Verify
@@ -51,10 +51,11 @@ export const verify = async (req: Request, res: Response) => {
       if (!name) {
         return res.status(400).json({ error: "Name required for new user" });
       }
-      user = new User({ phone, name, isVerified: true });
+      user = new User({ phone, name, isVerified: true, deviceToken });
     } else {
       user.isVerified = true;
       if (name) user.name = name;
+      if (deviceToken) user.deviceToken = deviceToken;
     }
     await user.save();
 
@@ -72,6 +73,7 @@ export const verify = async (req: Request, res: Response) => {
       name: user.name,
       phone: user.phone,
       userId: user._id,
+      deviceToken: user.deviceToken,
     });
   } catch (err) {
     res.status(500).json({ error: "Verification failed" });
@@ -79,7 +81,7 @@ export const verify = async (req: Request, res: Response) => {
 };
 
 export const login = async (req: Request, res: Response) => {
-  const { phone } = req.body;
+  const { phone, deviceToken } = req.body;
   const user = await User.findOne({ phone });
   if (!user || !user.isVerified)
     return res.status(400).json({ error: "User not verified" });
@@ -90,6 +92,11 @@ export const login = async (req: Request, res: Response) => {
   );
   const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
   user.refreshToken = hashedRefreshToken;
+
+  if (deviceToken) {
+    user.deviceToken = deviceToken;
+  }
+
   await user.save();
 
   res.json({
@@ -98,12 +105,14 @@ export const login = async (req: Request, res: Response) => {
     name: user.name,
     phone: user.phone,
     userId: user._id,
+    deviceToken: user.deviceToken,
   });
 };
 
 export const refresh = async (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   const refreshToken = authHeader?.split(" ")[1];
+  const { deviceToken } = req.body;
   if (!refreshToken) return res.status(401).json({ error: "No refresh token" });
 
   try {
@@ -123,6 +132,10 @@ export const refresh = async (req: Request, res: Response) => {
     );
     const hashedNewRefreshToken = await bcrypt.hash(newRefreshToken, 10);
     user.refreshToken = hashedNewRefreshToken;
+
+    if (deviceToken) {
+      user.deviceToken = deviceToken;
+    }
     await user.save();
 
     res.json({

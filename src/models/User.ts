@@ -6,6 +6,7 @@ export interface IUser extends Document {
   code: string;
   isVerified: boolean;
   refreshToken?: string;
+  deviceToken?: string;
 }
 
 const UserSchema: Schema = new Schema({
@@ -14,6 +15,7 @@ const UserSchema: Schema = new Schema({
   code: { type: String },
   isVerified: { type: Boolean, default: false },
   refreshToken: { type: String },
+  deviceToken: { type: String },
 });
 
 export default mongoose.model<IUser>("User", UserSchema);
