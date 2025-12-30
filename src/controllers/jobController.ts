@@ -5,6 +5,8 @@ import { paginate } from "../utils/pagination";
 import JobRequest from "../models/Request";
 import Chat, { IChat } from "../models/Chat";
 import Review from "../models/Review";
+import { sendNotification } from "../services/notification";
+import User from "../models/User";
 //Home end point
 export const getJobs = async (req: Request, res: Response) => {
   try {
@@ -58,6 +60,18 @@ export const createJob = async (req: Request, res: Response) => {
       category,
     });
     await newJob.save();
+    const users = await User.find({ _id: { $ne: userId } });
+    const deviceTokens = Array.from(
+      new Set(users.map((u) => u.deviceToken).filter(Boolean) as string[])
+    );
+
+    sendNotification({
+      deviceTokens: deviceTokens, // Fetch device tokens of users to notify
+      message: `${title}`,
+      title: "New Job Available",
+      data: { jobId: newJob._id },
+    });
+
     io.emit("jobCreated", newJob); // Emit event for real-time update
     res.status(201).json(newJob);
   } catch (err) {
@@ -145,6 +159,21 @@ export const requestJob = async (req: Request, res: Response) => {
     });
     await newRequest.save();
 
+    const owner = await User.findById(job.userId);
+    const requesterUser = await User.findById(userId);
+    const ownerDeviceTokens = [owner?.deviceToken].filter(Boolean) as string[];
+
+    if (ownerDeviceTokens.length > 0) {
+      sendNotification({
+        deviceTokens: ownerDeviceTokens,
+        message: `${requesterUser?.name ?? "Someone"} requested your job "${
+          job.title
+        }"`,
+        title: "Job Requested",
+        data: { jobId, requestId: newRequest._id },
+      });
+    }
+
     io.emit("jobRequested", { jobId, userId }); // Emit event for real-time update
 
     return res.json({ message: "Job request submitted", request: newRequest });
@@ -197,9 +226,17 @@ export const approveRequestJob = async (req: Request, res: Response) => {
       timestamp: new Date(),
     });
 
+    const requestUser = await User.findById(requesterId);
+
     await newMessage.save();
     io.to(requesterId).emit("newMessage", {
       message: `Your request for job ${jobId} has been approved.`,
+    });
+    sendNotification({
+      deviceTokens: [requestUser?.deviceToken].filter(Boolean) as string[], // Assuming requesterId is the device token
+      message: `Your request for job ${job.title} has been approved.`,
+      title: "Job Request Approved",
+      data: { jobId },
     });
     res.json({ message: "Request approved", request });
   } catch (err) {
@@ -304,9 +341,19 @@ export const rejectRequestJob = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Request not found" });
     }
 
+    const requesterId = request.userId?.toString();
+    const requestUser = await User.findById(requesterId);
+
     request.status = "rejected";
     await request.save();
+
     io.emit("requestRejected", { request }); // Emit event for real-time update
+    sendNotification({
+      deviceTokens: [requestUser?.deviceToken].filter(Boolean) as string[], // Assuming requesterId is the device token
+      message: `Your request for job ${job.title} has been rejected.`,
+      title: "Job Request Rejected",
+      data: { jobId },
+    });
     res.json({ message: "Request rejected", request });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
