@@ -33,8 +33,13 @@ export const getJobs = async (req: Request, res: Response) => {
       limit: limitNum,
     });
 
+    const populatedJobs = await Job.populate(jobs, [
+      { path: "userId", select: "name averageRating reviewsCount" },
+      { path: "assignedTo", select: "name averageRating reviewsCount" },
+    ]);
+
     res.json({
-      jobs,
+      jobs: populatedJobs,
       pagination,
     });
   } catch (err) {
@@ -434,6 +439,24 @@ export const leaveReview = async (req: Request, res: Response) => {
       comment,
     });
     await review.save();
+
+    // Recompute aggregates for the reviewee and save to User (denormalized)
+    const stats = await Review.aggregate([
+      { $match: { revieweeId: review.revieweeId } },
+      {
+        $group: {
+          _id: "$revieweeId",
+          avg: { $avg: "$rating" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const s = stats[0] || { avg: 0, count: 0 };
+    await User.findByIdAndUpdate(review.revieweeId, {
+      averageRating: s.avg || 0,
+      reviewsCount: s.count || 0,
+    });
 
     io.emit("reviewCreated", { review });
 
