@@ -105,6 +105,11 @@ export const getUserJobs = async (req: Request, res: Response) => {
       { page: pageNum, limit: limitNum }
     );
 
+    const populatedJobs = await Job.populate(jobs, [
+      { path: "userId", select: "name averageRating reviewsCount" },
+      { path: "assignedTo", select: "name averageRating reviewsCount" },
+    ]);
+
     const [reviewsCount, jobsDone] = await Promise.all([
       Review.countDocuments({ revieweeId: userId }), // or reviewerId if you want reviews given
       Job.find({ assignedTo: userId, status: "completed" }).populate(
@@ -114,7 +119,7 @@ export const getUserJobs = async (req: Request, res: Response) => {
     ]);
 
     res.json({
-      myJobs: jobs,
+      myJobs: populatedJobs,
       pagination,
       counts: {
         reviews: reviewsCount,
