@@ -14,6 +14,7 @@ import {
   leaveReview,
   rejectRequestJob,
   requestJob,
+  updateJob,
 } from "../controllers/jobController";
 import { authenticate } from "../utils/auth";
 
@@ -23,6 +24,7 @@ router.get("/retrieve-jobs", getJobs);
 router.post("/create-job", authenticate, createJob);
 router.get("/my-jobs", authenticate, getUserJobs);
 router.delete("/delete-job/:jobId", authenticate, deleteJob);
+router.put("/update-job/:jobId", authenticate, updateJob);
 
 router.post("/request-job/:jobId", authenticate, requestJob);
 router.post(
