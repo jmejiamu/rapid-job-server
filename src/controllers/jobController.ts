@@ -64,6 +64,11 @@ export const createJob = async (req: Request, res: Response) => {
       userId: userId,
       category,
     });
+    const populatedJobs = await Job.populate(newJob, [
+      { path: "userId", select: "name averageRating reviewsCount" },
+      { path: "assignedTo", select: "name averageRating reviewsCount" },
+    ]);
+
     await newJob.save();
     const users = await User.find({ _id: { $ne: userId } });
     const deviceTokens = Array.from(
@@ -77,8 +82,8 @@ export const createJob = async (req: Request, res: Response) => {
       data: { jobId: newJob._id },
     });
 
-    io.emit("jobCreated", newJob); // Emit event for real-time update
-    res.status(201).json(newJob);
+    io.emit("jobCreated", populatedJobs); // Emit event for real-time update
+    res.status(201).json(populatedJobs);
   } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
@@ -617,6 +622,9 @@ export const updateJob = async (req: Request, res: Response) => {
     ]);
 
     io.emit("jobUpdated", populated);
+
+    //This update the home screen in real-time
+    io.emit("jobCreated", populated);
     res.json({ job: populated });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
