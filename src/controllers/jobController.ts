@@ -579,3 +579,46 @@ export const deleteJob = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+export const updateJob = async (req: Request, res: Response) => {
+  const { jobId } = req.params;
+  const userId = (req as any).user?.id || (req as any).user?._id;
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const allowed = [
+    "title",
+    "pay",
+    "address",
+    "description",
+    "images",
+    "category",
+    "status",
+  ];
+  const updates: any = {};
+  for (const key of Object.keys(req.body)) {
+    if (allowed.includes(key)) updates[key] = req.body[key];
+  }
+
+  try {
+    const job = await Job.findById(jobId);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    // Only owner can update the job
+    if (job.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ error: "Forbidden: not job owner" });
+    }
+
+    Object.assign(job, updates);
+    await job.save();
+
+    const populated = await Job.populate(job, [
+      { path: "userId", select: "name averageRating reviewsCount" },
+      { path: "assignedTo", select: "name averageRating reviewsCount" },
+    ]);
+
+    io.emit("jobUpdated", populated);
+    res.json({ job: populated });
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+};
