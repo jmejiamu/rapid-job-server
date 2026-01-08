@@ -9,6 +9,7 @@ export interface IUser extends Document {
   deviceToken?: string;
   averageRating?: number;
   reviewsCount?: number;
+  notificationsEnabled?: boolean;
 }
 
 const UserSchema: Schema = new Schema({
@@ -20,6 +21,7 @@ const UserSchema: Schema = new Schema({
   deviceToken: { type: String },
   averageRating: { type: Number, default: 0 },
   reviewsCount: { type: Number, default: 0 },
+  notificationsEnabled: { type: Boolean, default: true },
 });
 
 export default mongoose.model<IUser>("User", UserSchema);

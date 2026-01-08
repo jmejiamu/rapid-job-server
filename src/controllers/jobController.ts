@@ -151,7 +151,7 @@ export const requestJob = async (req: Request, res: Response) => {
     }
     // Create a new request
 
-    const cannotDoThisJob = await job.userId.equals(userId);
+    const cannotDoThisJob = job.userId.equals(userId);
     if (cannotDoThisJob) {
       return res.status(400).json({ error: "You cannot request your own job" });
     }
@@ -164,7 +164,7 @@ export const requestJob = async (req: Request, res: Response) => {
         .json({ error: "You have already requested this job" });
     }
 
-    const ownerPostId = await job.userId;
+    const ownerPostId = job.userId;
 
     const newRequest = new JobRequest({
       jobId,
@@ -176,7 +176,11 @@ export const requestJob = async (req: Request, res: Response) => {
 
     const owner = await User.findById(job.userId);
     const requesterUser = await User.findById(userId);
-    const ownerDeviceTokens = [owner?.deviceToken].filter(Boolean) as string[];
+
+    const ownerDeviceTokens =
+      owner && owner.notificationsEnabled !== false
+        ? ([owner?.deviceToken].filter(Boolean) as string[])
+        : [];
 
     if (ownerDeviceTokens.length > 0) {
       sendNotification({
