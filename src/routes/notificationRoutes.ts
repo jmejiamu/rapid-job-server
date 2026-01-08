@@ -3,6 +3,6 @@ import { setNotificationPreference } from "../controllers/notificationController
 import { Router } from "express";
 const router = Router();
 
-router.post("/notifications", authenticate, setNotificationPreference);
+router.post("/push-notifications", authenticate, setNotificationPreference);
 
 export default router;
