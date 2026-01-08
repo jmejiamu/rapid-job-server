@@ -70,7 +70,11 @@ export const createJob = async (req: Request, res: Response) => {
     ]);
 
     await newJob.save();
-    const users = await User.find({ _id: { $ne: userId } });
+    const users = await User.find({
+      _id: { $ne: userId },
+      notificationsEnabled: { $ne: false }, // or { $eq: true } after backfill
+      deviceToken: { $exists: true, $ne: null },
+    }).select("deviceToken");
     const deviceTokens = Array.from(
       new Set(users.map((u) => u.deviceToken).filter(Boolean) as string[])
     );
@@ -251,12 +255,18 @@ export const approveRequestJob = async (req: Request, res: Response) => {
     io.to(requesterId).emit("newMessage", {
       message: `Your request for job ${jobId} has been approved.`,
     });
-    sendNotification({
-      deviceTokens: [requestUser?.deviceToken].filter(Boolean) as string[], // Assuming requesterId is the device token
-      message: `Your request for job ${job.title} has been approved.`,
-      title: "Job Request Approved",
-      data: { jobId },
-    });
+
+    if (
+      requestUser?.notificationsEnabled !== false &&
+      requestUser?.deviceToken
+    ) {
+      sendNotification({
+        deviceTokens: [requestUser?.deviceToken], // Assuming requesterId is the device token
+        message: `Your request for job ${job.title} has been approved.`,
+        title: "Job Request Approved",
+        data: { jobId },
+      });
+    }
     res.json({ message: "Request approved", request });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
@@ -367,12 +377,18 @@ export const rejectRequestJob = async (req: Request, res: Response) => {
     await request.save();
 
     io.emit("requestRejected", { request }); // Emit event for real-time update
-    sendNotification({
-      deviceTokens: [requestUser?.deviceToken].filter(Boolean) as string[], // Assuming requesterId is the device token
-      message: `Your request for job ${job.title} has been rejected.`,
-      title: "Job Request Rejected",
-      data: { jobId },
-    });
+
+    if (
+      requestUser?.notificationsEnabled !== false &&
+      requestUser?.deviceToken
+    ) {
+      sendNotification({
+        deviceTokens: [requestUser?.deviceToken], // Assuming requesterId is the device token
+        message: `Your request for job ${job.title} has been rejected.`,
+        title: "Job Request Rejected",
+        data: { jobId },
+      });
+    }
     res.json({ message: "Request rejected", request });
   } catch (err) {
     res.status(500).json({ error: "Server error" });
