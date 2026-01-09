@@ -70,13 +70,23 @@ export const createJob = async (req: Request, res: Response) => {
     ]);
 
     await newJob.save();
+
+    // Ensure only users who explicitly opted-in receive notifications,
+    // and also exclude the creator's device token as a safety guard.
+    const creator = await User.findById(userId).select("deviceToken");
     const users = await User.find({
       _id: { $ne: userId },
-      notificationsEnabled: { $ne: false }, // or { $eq: true } after backfill
+      notificationsEnabled: true, // require explicit opt-in
       deviceToken: { $exists: true, $ne: null },
     }).select("deviceToken");
+
     const deviceTokens = Array.from(
-      new Set(users.map((u) => u.deviceToken).filter(Boolean) as string[])
+      new Set(
+        users
+          .map((u) => u.deviceToken)
+          .filter(Boolean)
+          .filter((token) => token !== creator?.deviceToken) as string[]
+      )
     );
 
     sendNotification({
