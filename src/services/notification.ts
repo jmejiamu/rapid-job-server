@@ -39,7 +39,7 @@ export const sendNotification = async (payload: NotificationData) => {
 
     for (const chunk of chunks) {
       try {
-        const ticketChunk = expo.sendPushNotificationsAsync(chunk);
+        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(ticketChunk);
       } catch (error) {
         console.log(error);
